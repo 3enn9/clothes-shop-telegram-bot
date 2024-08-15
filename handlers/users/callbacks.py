@@ -1,4 +1,7 @@
 from aiogram import types, F, Router, Bot
+from aiogram.filters import StateFilter
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, InlineQueryResultArticle, \
     InputTextMessageContent, LinkPreviewOptions, InputMediaPhoto
 from sqlalchemy import select
@@ -10,6 +13,10 @@ from database.orm_query import orm_add_user, orm_add_to_cart, orm_delete_from_ca
 from keyboards import inlinekeyboard_menu, keyboard_menu
 
 router = Router(name=__name__)
+
+
+class Discount(StatesGroup):
+    promo_code = State()
 
 
 @router.callback_query(F.data == 'О нас')
@@ -59,6 +66,9 @@ async def basket(callback_query: types.CallbackQuery, bot: Bot, session: AsyncSe
     result_products = await session.execute(query_products)
     products = {product.id: product for product in result_products.scalars().all()}
     cost = 0
+    query_bonuses = select(User.bonuses).where(User.user_id == callback_query.from_user.id)
+    result_bonuses = await session.execute(query_bonuses)
+    user_bonuses = result_bonuses.scalar_one_or_none() or 0
 
     cart_text = "Товары в корзине:\n\n"
     for index, item in enumerate(cart_items):
@@ -67,20 +77,39 @@ async def basket(callback_query: types.CallbackQuery, bot: Bot, session: AsyncSe
             total_price = item.quantity * product.price
             cost += total_price
             cart_text += f"{index + 1}. {product.name}, Размер: {item.size} {item.quantity}шт. - {total_price} руб.\n"
-    cart_text += f'\nИтого по счету: {cost} руб.'
+    finnaly_cost = max(10, cost - user_bonuses)
+    cart_text += f'\nУ вас {user_bonuses} бонусных рублей\nМинимальная сумма заказа 10 руб.\n\nИтого по счету: {cost} руб - {cost - finnaly_cost} бонусов = {finnaly_cost} руб.'
 
     await bot.edit_message_text(
         text=f'[Корзина]\n\n{cart_text}',
         inline_message_id=callback_query.inline_message_id,
         reply_markup=InlineKeyboardMarkup(
-        inline_keyboard=[
-        [InlineKeyboardButton(text='Перейти к оплате', callback_data=f"Оплата_{cost}")],
-        [InlineKeyboardButton(text='Редактор заказа', callback_data="Редактировать корзину")],
-        [InlineKeyboardButton(text='\U0001F519В меню', callback_data='Магазин')]
-    ]
-),
+            inline_keyboard=[
+                [InlineKeyboardButton(text='Перейти к оплате', callback_data=f"Оплата_{finnaly_cost}")],
+                [InlineKeyboardButton(text='Редактор заказа', callback_data="Редактировать корзину")],
+                [InlineKeyboardButton(text='\U0001F519В меню', callback_data='Магазин')]
+            ]
+        ),
         parse_mode='Markdown'
     )
+
+
+@router.callback_query(StateFilter(None), F.data == 'Промокод')
+async def main_menu(callback_query: types.CallbackQuery, state: FSMContext, bot: Bot):
+    await bot.edit_message_text(
+        text='Введите промокод',
+        inline_message_id=callback_query.inline_message_id,
+        parse_mode='Markdown',
+    )
+    await state.set_state(Discount.promo_code)
+
+
+@router.message(Discount.promo_code, F.text)
+async def add_name(message: types.Message, state: FSMContext):
+    await state.update_data(promo_code=message.text)
+    await state.clear()
+    await message.answer(
+        f'Промокод на {message.text} успешно применен!\nНаличие скидки можете посмотреть в корзине с товарами!')
 
 
 @router.callback_query(F.data.startswith('buy_'))
@@ -88,7 +117,6 @@ async def add_in_basket(callback_query: types.CallbackQuery, session: AsyncSessi
     user = callback_query.from_user
     product_id = int(callback_query.data.split('_')[1])
     size = callback_query.data.split('_')[2]
-    await orm_add_user(session, user_id=user.id, first_name=user.first_name, last_name=user.last_name, phone=None)
     await orm_add_to_cart(session, user_id=user.id, product_id=product_id, size=size)
     await callback_query.answer(text=f'Товар успешно добавлен в корзину',
                                 show_alert=True)
@@ -163,9 +191,20 @@ async def remove_product(callback_query: types.CallbackQuery, session: AsyncSess
 
 
 @router.callback_query(F.data.startswith("Оплата"))
-async def pay(callback_query: types.CallbackQuery, bot: Bot):
+async def pay(callback_query: types.CallbackQuery, bot: Bot, session: AsyncSession):
+    user_id = callback_query.from_user.id
+
+    # Проверка наличия активного счета
+    query_user = select(User).where(User.user_id == user_id)
+    result_user = await session.execute(query_user)
+    user = result_user.scalar_one_or_none()
+
+    if user and user.has_active_invoice:
+        await callback_query.answer(text="У вас уже есть активный счет на оплату.", show_alert=True)
+        return
+
     cost = int(callback_query.data.split('_')[1]) * 100
-    await bot.send_invoice(
+    invoice_message = await bot.send_invoice(
         chat_id=callback_query.from_user.id,
         title="Оплата заказа",
         description="Платеж №",
@@ -193,22 +232,70 @@ async def pay(callback_query: types.CallbackQuery, bot: Bot):
         send_email_to_provider=False,
         is_flexible=False,
         disable_notification=False,
-        protect_content=False,
+        protect_content=True,
         reply_to_message_id=None,
         allow_sending_without_reply=True,
-        reply_markup=None,
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=f'Заплатить {cost // 100} RUB', pay=True)],
+                [InlineKeyboardButton(text="Отменить оплату", callback_data="Отменить оплату")]]
+        ),
         request_timeout=15
     )
+
+    # Обновление флага активного счета
+    user.has_active_invoice = True
+    user.invoice_message_id = invoice_message.message_id  # Сохраняем ID сообщения
+    await session.commit()
+
+
+@router.callback_query(F.data == "Отменить оплату")
+async def cancel_payment(callback_query: types.CallbackQuery, session: AsyncSession, bot: Bot):
+    user_id = callback_query.from_user.id
+
+    # Сброс активного счета
+    query_user = select(User).where(User.user_id == user_id)
+    result_user = await session.execute(query_user)
+    user = result_user.scalar_one_or_none()
+
+    if user:
+        user.has_active_invoice = False
+        await session.commit()
+
+    await callback_query.answer(text="Оплата была отменена.", show_alert=True)
+
+    if user and user.invoice_message_id:
+        try:
+            await bot.delete_message(
+                chat_id=callback_query.message.chat.id,
+                message_id=user.invoice_message_id
+            )
+        except Exception as e:
+            # Обработка ошибки, если сообщение не удалось удалить
+            print(f"Ошибка при удалении сообщения с инвойсом: {e}")
+
+
+@router.message(F.successful_payment)
+async def successful_payment(message: types.Message, session: AsyncSession):
+    user_id = message.from_user.id
+
+    # Очистка корзины
+    await orm_clear_cart(session, user_id)
+
+    # Сброс активного счета
+    query_user = select(User).where(User.user_id == user_id)
+    result_user = await session.execute(query_user)
+    user = result_user.scalar_one_or_none()
+
+    if user:
+        user.has_active_invoice = False
+        await session.commit()
+
+    await message.reply(text="Спасибо за оплату! Если есть вопросы напишите в поддержку @nzenn")
+    await message.answer(text="Добро пожаловать в наш магазин", reply_markup=inlinekeyboard_menu.inkb_start_menu)
 
 
 @router.pre_checkout_query()
 async def pre_check_query(pre_checkout_query: types.PreCheckoutQuery, bot: Bot):
     print('я сработал')
     await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
-
-
-@router.message(F.successful_payment)
-async def successful_payment(message: types.Message, session: AsyncSession):
-    await orm_clear_cart(session, message.from_user.id)
-    await message.reply(text="Спасибо за оплату! Если есть вопросы напишите в поддержку @nzenn")
-    await message.answer(text="Добро пожаловать в наш магазин", reply_markup=inlinekeyboard_menu.inkb_start_menu)

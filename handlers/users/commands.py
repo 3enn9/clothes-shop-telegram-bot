@@ -1,18 +1,20 @@
 from datetime import datetime
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from data.config import ID
 from aiogram import Router, F, types
 from keyboards import inlinekeyboard_menu, keyboard_menu
-
+from database.orm_query import orm_add_user
 
 router = Router(name=__name__)
-tag_storage = {}
 
 
 @router.message(Command(commands=['start']))
-async def start(message: types.Message):
+async def start(message: types.Message, session: AsyncSession):
+    user = message.from_user
+    await orm_add_user(session, user_id=user.id, first_name=user.first_name, last_name=user.last_name, phone=None)
     await message.answer(text="Добро пожаловать в наш магазин", reply_markup=inlinekeyboard_menu.inkb_start_menu)
 
 

@@ -21,8 +21,8 @@ inkb_main_menu = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text='🛒Корзина', callback_data="Корзина")],
             [InlineKeyboardButton(text='🛍Товары', callback_data="Товары")],
-            [InlineKeyboardButton(text='Способы оплаты', callback_data='пусто')],
-            [InlineKeyboardButton(text='Варианты доставки', callback_data='пусто')],
+            [InlineKeyboardButton(text='Промокод', callback_data='Промокод')],
+            # [InlineKeyboardButton(text='Варианты доставки', callback_data='пусто')],
             [InlineKeyboardButton(text='📄О нас', callback_data='О нас')]
         ]
     )
@@ -61,7 +61,11 @@ inkb_start_menu = InlineKeyboardMarkup(inline_keyboard=[
     [
         InlineKeyboardButton(text='Магазин', switch_inline_query_current_chat='')
     ],
-[
+    [
+        InlineKeyboardButton(text='Погода', callback_data=f'Погода'),
+        InlineKeyboardButton(text='Наш канал', callback_data=f'Канал'),
+    ],
+    [
         InlineKeyboardButton(text='Рефералы', callback_data=f'Пусто'),
         InlineKeyboardButton(text='Доставка', callback_data=f'Пусто'),
     ]

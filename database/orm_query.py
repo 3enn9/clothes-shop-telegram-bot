@@ -60,30 +60,16 @@ async def orm_add_user(
         first_name: str | None = None,
         last_name: str | None = None,
         phone: str | None = None,
+        bonuses: int = 0,
+        has_active_invoice: bool = False,
+        invoice_message_id: int | None = None
 ):
     query = select(User).where(User.user_id == user_id)
     result = await session.execute(query)
     if result.first() is None:
         session.add(
-            User(user_id=user_id, first_name=first_name, last_name=last_name, phone=phone)
-        )
-        await session.commit()
-
-
-##################### Добавляем юзера в БД #####################################
-
-async def orm_add_user(
-        session: AsyncSession,
-        user_id: int,
-        first_name: str | None = None,
-        last_name: str | None = None,
-        phone: str | None = None,
-):
-    query = select(User).where(User.user_id == user_id)
-    result = await session.execute(query)
-    if result.first() is None:
-        session.add(
-            User(user_id=user_id, first_name=first_name, last_name=last_name, phone=phone)
+            User(user_id=user_id, first_name=first_name, last_name=last_name, phone=phone, bonuses=bonuses,
+                 has_active_invoice=has_active_invoice, invoice_message_id=invoice_message_id)
         )
         await session.commit()
 

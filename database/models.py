@@ -1,4 +1,4 @@
-from sqlalchemy import String, Text, Float, Integer, DateTime, func, Numeric, ForeignKey, BigInteger
+from sqlalchemy import String, Text, Float, Integer, DateTime, func, Numeric, ForeignKey, BigInteger, Boolean
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -25,6 +25,9 @@ class User(Base):
     first_name: Mapped[str] = mapped_column(String(150), nullable=True)
     last_name: Mapped[str] = mapped_column(String(150), nullable=True)
     phone: Mapped[str] = mapped_column(String(13), nullable=True)
+    bonuses: Mapped[int] = mapped_column(Integer, default=0)
+    has_active_invoice: Mapped[bool] = mapped_column(Boolean, default=False)
+    invoice_message_id = mapped_column(Integer, nullable=True)
 
 
 class Cart(Base):
