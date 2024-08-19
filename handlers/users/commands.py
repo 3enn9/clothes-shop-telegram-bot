@@ -12,10 +12,15 @@ router = Router(name=__name__)
 
 
 @router.message(Command(commands=['start']))
-async def start(message: types.Message, session: AsyncSession):
-    user = message.from_user
-    await orm_add_user(session, user_id=user.id, first_name=user.first_name, last_name=user.last_name, phone=None)
-    await message.answer(text="Добро пожаловать в наш магазин", reply_markup=inlinekeyboard_menu.inkb_start_menu)
+@router.callback_query(F.data == 'main')
+async def start(event: types.Message | types.CallbackQuery, session: AsyncSession):
+    if isinstance(event, types.Message):
+        user = event.from_user
+        await orm_add_user(session, user_id=user.id, first_name=user.first_name, last_name=user.last_name, phone=None)
+        await event.answer(text="Добро пожаловать в наш магазин", reply_markup=inlinekeyboard_menu.inkb_start_menu)
+    else:
+        await event.message.edit_text(text="Добро пожаловать в наш магазин",
+                                     reply_markup=inlinekeyboard_menu.inkb_start_menu)
 
 
 @router.message(Command(commands=['help']))

@@ -12,4 +12,5 @@ DB_PASSWORD = str(os.getenv('DB_PASSWORD'))
 DB_NAME = str(os.getenv('DB_NAME'))
 DB_URL_LITE = os.getenv('DB_URL_LITE')
 DB_URL = os.getenv('DB_URL')
+API_KEY = str(os.getenv('API_KEY'))
 

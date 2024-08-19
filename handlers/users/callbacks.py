@@ -1,10 +1,12 @@
 import asyncio
+import logging
 
 from aiogram import types, F, Router, Bot
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice
+from aiohttp import ClientSession
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +14,7 @@ from database.models import User, Cart, Product
 from database.orm_query import orm_add_user, orm_add_to_cart, orm_delete_from_cart, orm_reduce_product_in_cart, \
     orm_clear_cart
 from keyboards import inlinekeyboard_menu
+from data.config import API_KEY
 
 router = Router(name=__name__)
 
@@ -26,6 +29,64 @@ async def about_us(callback_query: types.CallbackQuery, bot: Bot):
                                      'старается предложить лучший сервис для наших клиентов. Спасибо, что выбрали нас!',
                                 inline_message_id=callback_query.inline_message_id,
                                 reply_markup=inlinekeyboard_menu.inkb_back_main_menu)
+
+
+@router.callback_query(F.data == 'Погода')
+async def about_us(callback_query: types.CallbackQuery, bot: Bot):
+    await callback_query.message.edit_text(
+        text='Выберите город',
+        inline_message_id=callback_query.inline_message_id,
+        reply_markup=inlinekeyboard_menu.inkb_citys)
+
+
+@router.callback_query(F.data.startswith('weather_'))
+async def city_weather(callback_query: types.CallbackQuery):
+    coordinates = {
+        "Москва": {"lat": 55.7558, "lon": 37.6176},
+        "Париж": {"lat": 48.8566, "lon": 2.3522},
+        "ОАЭ": {"lat": 25.276987, "lon": 55.296249}
+    }
+
+    city = callback_query.data.split('_')[1]
+
+
+    # Извлеките широту и долготу
+    lat = coordinates[city]["lat"]
+    lon = coordinates[city]["lon"]
+
+    # Постройте URL для запроса к API
+    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API_KEY}&units=metric"
+    logging.info(f"Запрос URL: {url}")
+
+    async with ClientSession() as session:
+        try:
+            async with session.get(url) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    weather_description = data['weather'][0]['description']
+                    temperature = data['main']['temp']
+
+                    await callback_query.message.edit_text(
+                        text=f"Погода в {city}:\n"
+                             f"Температура: {temperature}°C\n"
+                             f"Описание: {weather_description.capitalize()}",
+                        reply_markup=InlineKeyboardMarkup(
+                            inline_keyboard=[[InlineKeyboardButton(text='Назад', callback_data='Погода')]])
+                    )
+                else:
+                    logging.error(f"Ошибка при запросе данных: {response.status}")
+                    await callback_query.message.edit_text(text="Не удалось получить данные о погоде.",
+                                                           reply_markup=InlineKeyboardMarkup(
+                                                               inline_keyboard=[[InlineKeyboardButton(text='Назад',
+                                                                                                      callback_data='Погода')]])
+                                                           )
+        except Exception as e:
+            logging.error(f"Ошибка соединения: {str(e)}")
+            await callback_query.message.edit_text(text="Ошибка соединения. Попробуйте позже.",
+                                                   reply_markup=InlineKeyboardMarkup(
+                                                       inline_keyboard=[[InlineKeyboardButton(text='Назад',
+                                                                                              callback_data='Погода')]])
+                                                   )
 
 
 @router.callback_query(F.data == 'Магазин')
@@ -224,7 +285,7 @@ async def pay(callback_query: types.CallbackQuery, bot: Bot, session: AsyncSessi
     cost = int(callback_query.data.split('_')[1]) * 100
     invoice_message = await bot.send_invoice(
         chat_id=callback_query.from_user.id,
-        title="Оплата заказа №",
+        title="Оплата заказа",
         description='\n'.join(description),
         payload='Payment throught a bot',
         provider_token="401643678:TEST:478c874c-3bf2-4b7e-880e-b93ff769b016",
@@ -234,8 +295,8 @@ async def pay(callback_query: types.CallbackQuery, bot: Bot, session: AsyncSessi
                          amount=cost,
                          )
         ],
-        max_tip_amount=5000,
-        suggested_tip_amounts=[1000, 2000, 3000, 4000],
+        max_tip_amount=50000,
+        suggested_tip_amounts=[10000, 20000, 30000, 40000],
         # start_parameter=''
         provider_data=None,
         photo_url='https://i.ibb.co/fGLKsYP/photo-2024-07-27-08-31-17.jpg',

@@ -37,33 +37,33 @@ async def main():
 
     logging.basicConfig(level=logging.INFO)
 
-    await bot.delete_webhook()
-    await dp.start_polling(bot)
+    # await bot.delete_webhook()
+    # await dp.start_polling(bot)
 
 
 
-    # # Создание веб-приложения для обработки запросов
-    # app = web.Application()
-    # webhook_path = '/webhook'  # Указанный путь для вебхука
-    # SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=webhook_path)
-    # setup_application(app, dp, bot=bot)
-    #
-    # # Запуск веб-приложения на всех интерфейсах и порту 443
-    # runner = web.AppRunner(app)
-    # await runner.setup()
-    # site = web.TCPSite(runner, host='0.0.0.0', port=443)
-    # await site.start()
-    #
-    # print(f"Bot is running on {os.getenv('URL_APP')}")
-    #
-    # # Ожидание сигнала завершения
-    # try:
-    #     while True:
-    #         await asyncio.sleep(3600)  # Keep alive
-    # except (KeyboardInterrupt, SystemExit):
-    #     pass
-    # finally:
-    #     await runner.cleanup()
+    # Создание веб-приложения для обработки запросов
+    app = web.Application()
+    webhook_path = '/webhook'  # Указанный путь для вебхука
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=webhook_path)
+    setup_application(app, dp, bot=bot)
+
+    # Запуск веб-приложения на всех интерфейсах и порту 443
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, host='0.0.0.0', port=443)
+    await site.start()
+
+    print(f"Bot is running on {os.getenv('URL_APP')}")
+
+    # Ожидание сигнала завершения
+    try:
+        while True:
+            await asyncio.sleep(3600)  # Keep alive
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    finally:
+        await runner.cleanup()
 
 
 if __name__ == '__main__':

@@ -65,15 +65,25 @@ inkb_start_menu = InlineKeyboardMarkup(inline_keyboard=[
         InlineKeyboardButton(text='Погода', callback_data=f'Погода'),
         InlineKeyboardButton(text='Наш канал', callback_data=f'Канал'),
     ],
-    [
-        InlineKeyboardButton(text='Рефералы', callback_data=f'Пусто'),
-        InlineKeyboardButton(text='Доставка', callback_data=f'Пусто'),
-    ]
+    # [
+    #     InlineKeyboardButton(text='Рефералы', callback_data=f'Пусто'),
+    #     InlineKeyboardButton(text='Доставка', callback_data=f'Пусто'),
+    # ]
 ])
 inkb_basket = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text='Перейти к оплате', callback_data="Оплата")],
         [InlineKeyboardButton(text='Редактор заказа', callback_data="Редактировать корзину")],
         [InlineKeyboardButton(text='\U0001F519В меню', callback_data='Магазин')]
+    ]
+)
+
+# Создание инлайн-клавиатуры с городами
+inkb_citys = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text='Москва', callback_data='weather_Москва')],
+        [InlineKeyboardButton(text='Париж', callback_data='weather_Париж')],
+        [InlineKeyboardButton(text='ОАЭ', callback_data='weather_ОАЭ')],
+        [InlineKeyboardButton(text='Назад', callback_data='main')]
     ]
 )
