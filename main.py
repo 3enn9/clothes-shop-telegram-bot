@@ -15,6 +15,9 @@ from middlewares.db import DataBaseSession
 
 async def on_startup(bot):
     # await drop_db()
+    await bot.set_webhook(url=f"{os.getenv('URL_APP')}")
+    webhook_info = await bot.get_webhook_info()
+    print(webhook_info)
 
     await create_db()
 
