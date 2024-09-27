@@ -1,3 +1,4 @@
+from aiogram import Bot
 from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -122,3 +123,21 @@ async def orm_clear_cart(session: AsyncSession, user_id: int):
     query = delete(Cart).where(Cart.user_id == user_id)
     await session.execute(query)
     await session.commit()
+
+
+##################### Удалить инвойсы #####################################
+
+async def orm_del_invoices(session: AsyncSession, bot: Bot):
+    result = await session.execute(select(User).filter(User.invoice_message_id.isnot(None)))
+    users = result.scalars().all()
+
+    for user in users:
+        if user.invoice_message_id:  # Проверяем, что invoice_message_id не None
+            try:
+                await bot.delete_message(chat_id=user.user_id, message_id=user.invoice_message_id)
+                user.invoice_message_id = None  # Устанавливаем значение в None после удаления
+                user.has_active_invoice = False
+            except Exception as e:
+                print(f"Не удалось удалить сообщение для пользователя {user.user_id}: {e}")
+
+    await session.commit()  # Сохраняем изменения в базе данных

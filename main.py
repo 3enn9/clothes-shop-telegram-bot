@@ -1,35 +1,37 @@
 import asyncio
 import logging
 import os
+from functools import partial
 
 from aiogram import Bot, Dispatcher
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from data import config
 
 from database.engine import create_db, drop_db, session_maker
+from database.orm_query import orm_del_invoices
 from handlers import router
 from middlewares.db import DataBaseSession
 
-
 async def on_startup(bot):
     # await drop_db()
-    await bot.set_webhook(url=f"{os.getenv('URL_APP')}")
-    webhook_info = await bot.get_webhook_info()
-    print(webhook_info)
-
+    # await bot.set_webhook(url=f"{os.getenv('URL_APP')}")
     await create_db()
 
 
 async def on_shutdown(bot):
+    async with session_maker() as session:
+        # await bot.delete_webhook()  # Если вам нужно удалить вебхук, раскомментируйте это
+        await orm_del_invoices(session, bot)
     print('бот лег')
 
 
 async def main():
     API_TOKEN = config.TOKEN
     bot = Bot(token=API_TOKEN)
-    bot.my_admins_list = []
+    bot.my_admins_list = [877804669]
     dp = Dispatcher(bot=bot)
     dp.include_router(router)
 
@@ -40,33 +42,32 @@ async def main():
 
     logging.basicConfig(level=logging.INFO)
 
-    # await bot.delete_webhook()
-    # await dp.start_polling(bot)
+    await dp.start_polling(bot)
 
 
 
-    # Создание веб-приложения для обработки запросов
-    app = web.Application()
-    webhook_path = '/webhook'  # Указанный путь для вебхука
-    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=webhook_path)
-    setup_application(app, dp, bot=bot)
-
-    # Запуск веб-приложения на всех интерфейсах и порту 443
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, host='0.0.0.0', port=443)
-    await site.start()
-
-    print(f"Bot is running on {os.getenv('URL_APP')}")
-
-    # Ожидание сигнала завершения
-    try:
-        while True:
-            await asyncio.sleep(3600)  # Keep alive
-    except (KeyboardInterrupt, SystemExit):
-        pass
-    finally:
-        await runner.cleanup()
+    # # Создание веб-приложения для обработки запросов
+    # app = web.Application()
+    # webhook_path = '/webhook'  # Указанный путь для вебхука
+    # SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=webhook_path)
+    # setup_application(app, dp, bot=bot)
+    #
+    # # Запуск веб-приложения на всех интерфейсах и порту 443
+    # runner = web.AppRunner(app)
+    # await runner.setup()
+    # site = web.TCPSite(runner, host='0.0.0.0', port=443)
+    # await site.start()
+    #
+    # print(f"Bot is running on {os.getenv('URL_APP')}")
+    #
+    # # Ожидание сигнала завершения
+    # try:
+    #     while True:
+    #         await asyncio.sleep(3600)  # Keep alive
+    # except (KeyboardInterrupt, SystemExit):
+    #     pass
+    # finally:
+    #     await runner.cleanup()
 
 
 if __name__ == '__main__':

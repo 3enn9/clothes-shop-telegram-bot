@@ -41,3 +41,15 @@ class Cart(Base):
 
     user: Mapped['User'] = relationship(backref='cart')
     product: Mapped['Product'] = relationship(backref='cart')
+
+
+class Orders(Base):
+    __tablename__ = 'orders'
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('user.user_id', ondelete='CASCADE'), nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False)  # Описание заказа
+    phone: Mapped[str] = mapped_column(String, nullable=True)  # Номер телефона
+    email: Mapped[str] = mapped_column(String, nullable=True)  # Email
+    shipping_address: Mapped[str] = mapped_column(String, nullable=True)  # Адрес доставки
+    status: Mapped[str] = mapped_column(String, nullable=False, default='pending')  # Статус заказа
