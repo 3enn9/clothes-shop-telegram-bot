@@ -1,6 +1,8 @@
 import os
 
+from fastapi import FastAPI
 import yookassa
+from aiogram import Bot
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,6 +18,9 @@ DB_URL = os.getenv('DB_URL')
 API_KEY = str(os.getenv('API_KEY'))
 shopID = str(os.getenv('SHOPID'))
 key = str(os.getenv('KEY'))
+
+bot = Bot(token=TOKEN)
+app = FastAPI()
 
 yookassa.Configuration.account_id = shopID
 yookassa.Configuration.secret_key = key

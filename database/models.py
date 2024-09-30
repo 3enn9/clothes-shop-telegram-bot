@@ -28,6 +28,7 @@ class User(Base):
     bonuses: Mapped[int] = mapped_column(Integer, default=0)
     has_active_invoice: Mapped[bool] = mapped_column(Boolean, default=False)
     invoice_message_id = mapped_column(Integer, nullable=True)
+    payment_id: Mapped[str] = mapped_column(String, nullable=True)
 
 
 class Cart(Base):

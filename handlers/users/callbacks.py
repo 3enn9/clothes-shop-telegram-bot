@@ -8,12 +8,16 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, ReplyKeyboardMarkup, KeyboardButton
 from aiohttp import ClientSession
+
+from fastapi.responses import JSONResponse
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from yookassa import Payment, Configuration
 from yookassa.domain.notification import WebhookNotificationEventType
 from yookassa.domain.response import PaymentResponse
 
+from database.engine import session_maker
 from database.models import User, Cart, Product, Orders
 from database.orm_query import orm_add_user, orm_add_to_cart, orm_delete_from_cart, orm_reduce_product_in_cart, \
     orm_clear_cart
@@ -454,6 +458,7 @@ async def address(message: types.Message, state: FSMContext, bot: Bot, session: 
     # Сохраняем ID инвойса и обновляем состояние пользователя
     user.invoice_message_id = message_invoice.message_id
     user.has_active_invoice = True
+    user.payment_id = payment_id
     await session.commit()
 
     # Очищаем состояние FSM
@@ -472,3 +477,31 @@ async def address(message: types.Message, state: FSMContext, bot: Bot, session: 
         finally:
             updated_user.has_active_invoice = False
             await session.commit()
+
+from data.config import app, bot
+
+async def get_session() -> AsyncSession:
+    async with session_maker() as session:
+        yield session
+@app.post("/api/payment/notifications")
+async def payment_notifications(data: dict):
+    # Логика обработки уведомления о платеже
+    async with session_maker() as session:
+        if data.get('event') == 'payment.succeeded':
+            payment_id = data['object']['id']
+            user_id = int(data['object']['metadata']['user_id'])
+            # Очистка корзины
+            await orm_clear_cart(session, user_id)
+
+            # Сброс активного счета
+            query_user = select(User).where(User.user_id == user_id)
+            result_user = await session.execute(query_user)
+            user = result_user.scalar_one_or_none()
+
+            if user:
+                user.has_active_invoice = False
+                await session.commit()
+
+            await bot.send_message(chat_id=user_id, text="Ваш платеж успешно обработан!\nВ ближайшее время с вами свяжется наш менеджер ")
+
+    return JSONResponse(content={"status": "ok"}, status_code=200)

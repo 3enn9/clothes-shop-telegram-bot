@@ -63,14 +63,15 @@ async def orm_add_user(
         phone: str | None = None,
         bonuses: int = 0,
         has_active_invoice: bool = False,
-        invoice_message_id: int | None = None
+        invoice_message_id: int | None = None,
+        payment_id: str | None = None
 ):
     query = select(User).where(User.user_id == user_id)
     result = await session.execute(query)
     if result.first() is None:
         session.add(
             User(user_id=user_id, first_name=first_name, last_name=last_name, phone=phone, bonuses=bonuses,
-                 has_active_invoice=has_active_invoice, invoice_message_id=invoice_message_id)
+                 has_active_invoice=has_active_invoice, invoice_message_id=invoice_message_id, payment_id=payment_id)
         )
         await session.commit()
 
@@ -137,6 +138,7 @@ async def orm_del_invoices(session: AsyncSession, bot: Bot):
                 await bot.delete_message(chat_id=user.user_id, message_id=user.invoice_message_id)
                 user.invoice_message_id = None  # Устанавливаем значение в None после удаления
                 user.has_active_invoice = False
+                user.payment_id = None
             except Exception as e:
                 print(f"Не удалось удалить сообщение для пользователя {user.user_id}: {e}")
 

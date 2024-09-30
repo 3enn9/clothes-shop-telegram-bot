@@ -1,36 +1,27 @@
 import asyncio
 import logging
-import os
-from functools import partial
-
+import uvicorn
 from aiogram import Bot, Dispatcher
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
-from aiohttp import web
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from data import config
-
-from database.engine import create_db, drop_db, session_maker
+from middlewares.db import DataBaseSession
+from database.engine import create_db, session_maker
 from database.orm_query import orm_del_invoices
 from handlers import router
-from middlewares.db import DataBaseSession
+from data.config import bot, app  # FastAPI импортирован как `app`
 
 async def on_startup(bot):
-    # await drop_db()
-    # await bot.set_webhook(url=f"{os.getenv('URL_APP')}")
+    # Инициализация базы данных или других ресурсов
     await create_db()
 
 
 async def on_shutdown(bot):
+    # Очистка ресурсов перед завершением
     async with session_maker() as session:
-        # await bot.delete_webhook()  # Если вам нужно удалить вебхук, раскомментируйте это
         await orm_del_invoices(session, bot)
     print('бот лег')
 
 
-async def main():
-    API_TOKEN = config.TOKEN
-    bot = Bot(token=API_TOKEN)
+async def run_bot():
+    """Запуск Telegram-бота."""
     bot.my_admins_list = [877804669]
     dp = Dispatcher(bot=bot)
     dp.include_router(router)
@@ -45,29 +36,19 @@ async def main():
     await dp.start_polling(bot)
 
 
+async def run_fastapi():
+    """Запуск FastAPI через uvicorn."""
+    config = uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
 
-    # # Создание веб-приложения для обработки запросов
-    # app = web.Application()
-    # webhook_path = '/webhook'  # Указанный путь для вебхука
-    # SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=webhook_path)
-    # setup_application(app, dp, bot=bot)
-    #
-    # # Запуск веб-приложения на всех интерфейсах и порту 443
-    # runner = web.AppRunner(app)
-    # await runner.setup()
-    # site = web.TCPSite(runner, host='0.0.0.0', port=443)
-    # await site.start()
-    #
-    # print(f"Bot is running on {os.getenv('URL_APP')}")
-    #
-    # # Ожидание сигнала завершения
-    # try:
-    #     while True:
-    #         await asyncio.sleep(3600)  # Keep alive
-    # except (KeyboardInterrupt, SystemExit):
-    #     pass
-    # finally:
-    #     await runner.cleanup()
+
+async def main():
+    # Запускаем бота и сервер FastAPI параллельно
+    await asyncio.gather(
+        run_bot(),
+        run_fastapi()
+    )
 
 
 if __name__ == '__main__':
